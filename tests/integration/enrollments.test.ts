@@ -1,11 +1,13 @@
-import app, { init } from '@/app';
-import { prisma } from '@/config';
 import { generateCPF, getStates } from '@brazilian-utils/brazilian-utils';
 import faker from '@faker-js/faker';
 import dayjs from 'dayjs';
 import httpStatus from 'http-status';
 import * as jwt from 'jsonwebtoken';
 import supertest from 'supertest';
+import nock from 'nock';
+
+import { prisma } from '@/config';
+import app, { init } from '@/app';
 import { createEnrollmentWithAddress, createUser, createhAddressWithCEP as createAddressWithCEP } from '../factories';
 import { cleanDb, generateValidToken } from '../helpers';
 
@@ -80,6 +82,19 @@ describe('GET /enrollments', () => {
 
 describe('GET /enrollments/cep', () => {
   it('should respond with status 200 when CEP is valid', async () => {
+    nock('https://viacep.com.br').get('/ws/04538132/json/').reply(200, {
+      cep: '04538-132',
+      logradouro: 'Avenida Brigadeiro Faria Lima',
+      complemento: 'de 3252 ao fim - lado par',
+      bairro: 'Itaim Bibi',
+      localidade: 'São Paulo',
+      uf: 'SP',
+      ibge: '3550308',
+      gia: '1004',
+      ddd: '11',
+      siafi: '7107',
+    });
+
     const response = await server.get('/enrollments/cep?cep=04538132');
     const address = createAddressWithCEP();
 
@@ -88,6 +103,8 @@ describe('GET /enrollments/cep', () => {
   });
 
   it('should respond with status 204 when CEP is invalid', async () => {
+    nock('https://viacep.com.br').get('/ws/00/json/').reply(404);
+
     const response = await server.get('/enrollments/cep?cep=00');
 
     expect(response.status).toBe(httpStatus.NO_CONTENT);
@@ -153,9 +170,40 @@ describe('POST /enrollments', () => {
         },
       });
 
+      type Body = {
+        name: string;
+        cpf: string;
+        birthday: string;
+        phone: string;
+        address: {
+          cep: string;
+          street: string;
+          city: string;
+          number: string;
+          state: string;
+          neighborhood: string;
+          addressDetail: string;
+        };
+      };
+
+      const nockViaCep = (body: Body) =>
+        nock('https://viacep.com.br').get(`/ws/${body.address.cep}/json/`).reply(200, {
+          cep: body.address.cep,
+          logradouro: body.address.street,
+          complemento: body.address.addressDetail,
+          bairro: body.address.neighborhood,
+          localidade: body.address.city,
+          uf: body.address.state,
+          ibge: '4305108',
+          gia: '1004',
+          ddd: '51',
+          siafi: '7107',
+        });
+
       it('should respond with status 201 and create new enrollment if there is not any', async () => {
         const body = generateValidBody();
         const token = await generateValidToken();
+        nockViaCep(body);
 
         const response = await server.post('/enrollments').set('Authorization', `Bearer ${token}`).send(body);
 
@@ -169,6 +217,7 @@ describe('POST /enrollments', () => {
         const enrollment = await createEnrollmentWithAddress(user);
         const body = generateValidBody();
         const token = await generateValidToken(user);
+        nockViaCep(body);
 
         const response = await server.post('/enrollments').set('Authorization', `Bearer ${token}`).send(body);
 
@@ -205,9 +254,10 @@ describe('POST /enrollments', () => {
         },
       });
 
-      it('should respond with status 400 and create new enrollment if there is not any', async () => {
+      it('should respond with status 400', async () => {
         const body = generateInvalidBody();
         const token = await generateValidToken();
+        nock('https://viacep.com.br').get(`/ws/${body.address.cep}/json/`).reply(404);
 
         const response = await server.post('/enrollments').set('Authorization', `Bearer ${token}`).send(body);
 
