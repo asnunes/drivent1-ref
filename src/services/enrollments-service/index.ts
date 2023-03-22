@@ -6,7 +6,7 @@ import enrollmentRepository, { CreateEnrollmentParams } from '@/repositories/enr
 import { exclude } from '@/utils/prisma-utils';
 
 async function getAddressFromCEP() {
-  const result = await request.get('https://viacep.com.br/ws/37440000/json/');
+  const result = await request.get(`${process.env.VIA_CEP_API}/37440000/json/`);
 
   if (!result.data) {
     throw notFoundError();
