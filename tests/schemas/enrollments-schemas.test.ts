@@ -1,6 +1,6 @@
-import { createOrUpdateEnrollmentSchema } from '@/schemas';
 import { generateCPF, getStates } from '@brazilian-utils/brazilian-utils';
 import { faker } from '@faker-js/faker';
+import { createOrUpdateEnrollmentSchema } from '@/schemas';
 
 describe('createEnrollmentSchema', () => {
   const generateValidInput = () => ({

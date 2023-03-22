@@ -1,18 +1,22 @@
-import { init } from "@/app";
-import { prisma } from "@/config";
-import userService, { duplicatedEmailError } from "@/services/users-service";
-import faker from "@faker-js/faker";
-import bcrypt from "bcrypt";
-import { createUser as createUserSeed, createEvent as createEventSeed } from "../factories";
-import { cleanDb } from "../helpers";
+import faker from '@faker-js/faker';
+import bcrypt from 'bcrypt';
+import { createUser as createUserSeed, createEvent as createEventSeed } from '../factories';
+import { cleanDb } from '../helpers';
+import { init, close } from '@/app';
+import { prisma } from '@/config';
+import userService, { duplicatedEmailError } from '@/services/users-service';
 
 beforeAll(async () => {
   await init();
   await cleanDb();
 });
 
-describe("createUser", () => {
-  it("should throw duplicatedUserError if there is a user with given email", async () => {
+afterAll(async () => {
+  await close();
+});
+
+describe('createUser', () => {
+  it('should throw duplicatedUserError if there is a user with given email', async () => {
     const existingUser = await createUserSeed();
     await createEventSeed();
 
@@ -21,13 +25,13 @@ describe("createUser", () => {
         email: existingUser.email,
         password: faker.internet.password(6),
       });
-      fail("should throw duplicatedUserError");
+      fail('should throw duplicatedUserError');
     } catch (error) {
       expect(error).toEqual(duplicatedEmailError());
     }
   });
 
-  it("should create user when given email is unique", async () => {
+  it('should create user when given email is unique', async () => {
     const user = await userService.createUser({
       email: faker.internet.email(),
       password: faker.internet.password(6),
@@ -46,7 +50,7 @@ describe("createUser", () => {
     );
   });
 
-  it("should hash user password", async () => {
+  it('should hash user password', async () => {
     const rawPassword = faker.internet.password(6);
     const user = await userService.createUser({
       email: faker.internet.email(),
